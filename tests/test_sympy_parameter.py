@@ -56,6 +56,6 @@ def test_parameter_pattern_simulation(backend, fx_rng: Generator) -> None:
 
     result_simulate_then_subs = pattern.simulate_pattern(backend=symb_backend, rng=fx_rng).subs(alpha, 0.5)
     if backend == "statevector":
-        assert np.allclose(result_subs_then_simulate.psi, result_simulate_then_subs.psi)
+        assert np.allclose(result_subs_then_simulate.flatten(), result_simulate_then_subs.flatten())
     elif backend == "densitymatrix":
         assert np.allclose(result_subs_then_simulate.rho, result_simulate_then_subs.rho)
