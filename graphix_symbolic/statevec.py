@@ -173,29 +173,37 @@ class Statevec(DenseState):
         self.tensor(sv_to_add)
 
     @override
-    def evolve_single(self, op: Matrix, i: int) -> None:
-        """Apply a single-qubit operation.
+    def evolve_single(self, op: Matrix, qubit: int) -> None:
+        """Apply a single-qubit operator.
 
         Parameters
         ----------
-        op : numpy.ndarray
-            2*2 matrix
-        i : int
+        op : Matrix
+            Matrix of shape :math:`(2, 2)` representing
+            the operator to apply.
+        qubit : int
+            Target qubit index.
             qubit index
         """
-        psi = tensordot(op, self.psi, (1, i))
-        self.psi = np.moveaxis(psi, 0, i)
+        psi = tensordot(op, self.psi, (1, qubit))
+        self.psi = np.moveaxis(psi, 0, qubit)
 
     @override
-    def evolve(self, op: Matrix, qargs: Sequence[int]) -> None:
-        """Apply a multi-qubit operation.
+    def evolve(self, op: Matrix, qubits: Sequence[int]) -> None:
+        """Apply a multi-qubit operator.
 
         Parameters
         ----------
-        op : numpy.ndarray
-            2^n*2^n matrix
-        qargs : list of int
-            target qubits' indices
+        op : Matrix
+            Matrix of shape :math:`(2^n, 2^n)` representing
+            the operator to apply.
+        qubits : Sequence[int]
+            Target qubit indices.
+
+        Notes
+        -----
+        This method is a fallback for circuit simulation and it's not required
+        for pattern simulation.
         """
         op_dim = int(np.log2(len(op)))
         # TODO shape = (2,)* 2 * op_dim
@@ -204,9 +212,9 @@ class Statevec(DenseState):
         psi = tensordot(
             op_tensor,
             self.psi,
-            (tuple(op_dim + i for i in range(len(qargs))), qargs),
+            (tuple(op_dim + i for i in range(len(qubits))), qubits),
         )
-        self.psi = np.moveaxis(psi, range(len(qargs)), qargs)
+        self.psi = np.moveaxis(psi, range(len(qubits)), qubits)
 
     def dims(self) -> tuple[int, ...]:
         """Return the dimensions."""
@@ -220,10 +228,10 @@ class Statevec(DenseState):
         return self.psi.ndim
 
     @override
-    def remove_qubit(self, qarg: int) -> None:
+    def remove_qubit(self, qubit: int) -> None:
         r"""Remove a separable qubit from the system and assemble a statevector for remaining qubits.
 
-        This results in the same result as partial trace, if the qubit *qarg* is separable from the rest.
+        This results in the same result as partial trace, if the qubit *qubit* is separable from the rest.
 
         For a statevector :math:`\ket{\psi} = \sum c_i \ket{i}` with sum taken over
         :math:`i \in [ 0 \dots 00,\ 0\dots 01,\ \dots,\
@@ -243,12 +251,12 @@ class Statevec(DenseState):
                     \ket{1 \dots 1_{\mathrm{k-1}}1_{\mathrm{k+1}} \dots 11},
            \end{align}
 
-        (after normalization) for :math:`k =` qarg. If the :math:`k` th qubit is in :math:`\ket{1}` state,
+        (after normalization) for :math:`k =` qubit. If the :math:`k` th qubit is in :math:`\ket{1}` state,
         above will return zero amplitudes; in such a case the returned state will be the one above with
         :math:`0_{\mathrm{k}}` replaced with :math:`1_{\mathrm{k}}` .
 
         .. warning::
-            This method assumes the qubit with index *qarg* to be separable from the rest,
+            This method assumes the qubit with index *qubit* to be separable from the rest,
             and is implemented as a significantly faster alternative for partial trace to
             be used after single-qubit measurements.
             Care needs to be taken when using this method.
@@ -256,35 +264,35 @@ class Statevec(DenseState):
 
         Parameters
         ----------
-        qarg : int
+        qubit : int
             qubit index
         """
         norm = _norm(self.psi)
         if isinstance(norm, SupportsFloat):
             assert not np.isclose(norm, 0)
         index: list[slice[int] | int] = [slice(None)] * self.psi.ndim
-        index[qarg] = 0
+        index[qubit] = 0
         psi = self.psi[tuple(index)]
         norm = _norm(psi)
         if isinstance(norm, SupportsFloat) and math.isclose(norm, 0):
-            index[qarg] = 1
+            index[qubit] = 1
             psi = self.psi[tuple(index)]
         self.psi = psi
         self.normalize()
 
     @override
-    def entangle(self, edge: tuple[int, int]) -> None:
-        """Connect graph nodes.
+    def entangle(self, qubits: tuple[int, int]) -> None:
+        """Apply a CZ gate on two qubits.
 
         Parameters
         ----------
-        edge : tuple of int
-            (control, target) qubit indices
+        qubits : tuple[int, int]
+            (control, target) qubit indices.
         """
         # contraction: 2nd index - control index, and 3rd index - target index.
-        psi = tensordot(CZ_TENSOR, self.psi, ((2, 3), edge))
+        psi = tensordot(CZ_TENSOR, self.psi, ((2, 3), qubits))
         # sort back axes
-        self.psi = np.moveaxis(psi, (0, 1), edge)
+        self.psi = np.moveaxis(psi, (0, 1), qubits)
 
     def tensor(self, other: Statevec) -> None:
         r"""Tensor product state with other qubits.
@@ -317,12 +325,12 @@ class Statevec(DenseState):
 
     @override
     def swap(self, qubits: tuple[int, int]) -> None:
-        """Swap qubits.
+        """Apply SWAP gate between two qubits.
 
         Parameters
         ----------
-        qubits : tuple of int
-            (control, target) qubit indices
+        qubits : tuple[int, int]
+            (control, target) qubit indices.
         """
         # contraction: 2nd index - control index, and 3rd index - target index.
         psi = tensordot(SWAP_TENSOR, self.psi, ((2, 3), qubits))
@@ -351,14 +359,14 @@ class Statevec(DenseState):
         return self.psi.flatten()
 
     @override
-    def expectation_single(self, op: Matrix, loc: int) -> complex:
+    def expectation_single(self, op: Matrix, qubit: int) -> complex:
         """Return the expectation value of single-qubit operator.
 
         Parameters
         ----------
         op : numpy.ndarray
             2*2 operator
-        loc : int
+        qubit : int
             target qubit index
 
         Returns
@@ -368,17 +376,17 @@ class Statevec(DenseState):
         st1 = copy.copy(self)
         st1.normalize()
         st2 = copy.copy(st1)
-        st1.evolve_single(op, loc)
+        st1.evolve_single(op, qubit)
         return complex(np.dot(st2.psi.flatten().conjugate(), st1.psi.flatten()))
 
-    def expectation_value(self, op: Matrix, qargs: Sequence[int]) -> complex:
+    def expectation_value(self, op: Matrix, qubits: Sequence[int]) -> complex:
         """Return the expectation value of multi-qubit operator.
 
         Parameters
         ----------
         op : numpy.ndarray
             2^n*2^n operator
-        qargs : list of int
+        qubits : list of int
             target qubit indices
 
         Returns
@@ -388,7 +396,7 @@ class Statevec(DenseState):
         st2 = copy.copy(self)
         st2.normalize()
         st1 = copy.copy(st2)
-        st1.evolve(op, qargs)
+        st1.evolve(op, qubits)
         return complex(np.dot(st2.psi.flatten().conjugate(), st1.psi.flatten()))
 
     def subs(self, variable: Parameter, substitute: ExpressionOrSupportsFloat) -> Statevec:

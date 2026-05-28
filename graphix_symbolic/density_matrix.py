@@ -18,9 +18,10 @@ from graphix import parameter
 from graphix.channels import KrausChannel
 from graphix.parameter import Expression, ExpressionOrFloat, ExpressionOrSupportsComplex
 from graphix.sim.base_backend import DenseState, DenseStateBackend, Matrix, kron, matmul, outer, tensordot, vdot
-from graphix.sim.statevec import CNOT_TENSOR, CZ_TENSOR, SWAP_TENSOR, Statevec
 from graphix.states import BasicStates, State
 from typing_extensions import override
+
+from graphix_symbolic.statevec import CNOT_TENSOR, CZ_TENSOR, SWAP_TENSOR, Statevec
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
