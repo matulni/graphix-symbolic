@@ -22,7 +22,7 @@ def test_parameter_circuit_simulation(fx_rng: Generator) -> None:
     result_simulate_then_subs = circuit.simulate_statevector(
         backend=StatevectorBackend(branch_selector=RandomBranchSelector(pr_calc=False), symbolic=True)
     ).statevec.subs(alpha, 0.5)
-    assert np.allclose(result_subs_then_simulate.psi, result_simulate_then_subs.psi)
+    assert np.allclose(result_subs_then_simulate.flatten(), result_simulate_then_subs.psi)
 
 
 def test_parameter_parallel_substitution(fx_rng: Generator) -> None:
@@ -36,7 +36,7 @@ def test_parameter_parallel_substitution(fx_rng: Generator) -> None:
     result_simulate_then_subs = circuit.simulate_statevector(
         backend=StatevectorBackend(branch_selector=RandomBranchSelector(pr_calc=False), symbolic=True)
     ).statevec.xreplace(mapping)
-    assert np.allclose(result_subs_then_simulate.psi, result_simulate_then_subs.psi)
+    assert np.allclose(result_subs_then_simulate.flatten(), result_simulate_then_subs.flatten())
 
 
 @pytest.mark.parametrize("backend", ["statevector", "densitymatrix"])
