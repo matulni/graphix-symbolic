@@ -230,8 +230,7 @@ class TestStatevecGraphix:
         for _ in range(nqubits - 1):  # Remove a node at each iteration
             sv_test.evolve_single(projector, q)
             sv_test.remove_qubit(q)
-            sv_ref.evolve_single(projector, q)
-            sv_ref.remove_qubit(q)
+            sv_ref.project_qubit(projector, q)
 
             assert sv_ref.isclose(SVGraphix(data=sv_test.flatten()))
 
