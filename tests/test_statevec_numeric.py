@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+import itertools
 import math
 from typing import TYPE_CHECKING
 
@@ -7,7 +9,8 @@ import numpy as np
 import numpy.typing as npt
 import pytest
 from graphix.clifford import Clifford
-from graphix.random_objects import rand_circuit
+from graphix.random_objects import rand_circuit, rand_state_vector
+from graphix.sim.base_backend import NodeIndex
 from graphix.sim.statevec import Statevec as SVGraphix
 from graphix.sim.statevec import StatevectorBackend as SBGraphix
 from graphix.states import BasicStates
@@ -16,8 +19,14 @@ from numpy.random import Generator
 from graphix_symbolic import Statevec, StatevectorBackend
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from typing import Literal
+
+    from graphix.sim.base_backend import DenseState
     from graphix.states import State
     from numpy.random import PCG64
+
+    _ENCODING = Literal["LSB", "MSB"]
 
 
 def generate_rnd_data(rng: Generator, nqubits: int) -> npt.NDArray[np.complex128]:
@@ -152,6 +161,33 @@ class TestStatevec:
         sv.remove_qubit(q)
         assert np.allclose(sv.flatten(), sv_ref.flatten())
 
+    @pytest.mark.parametrize("permutation", itertools.permutations(range(3)))
+    def test_permute(self, fx_rng: Generator, permutation: Sequence[int]) -> None:
+        nqubits = len(permutation)
+        statevec = Statevec(rand_state_vector(nqubits, fx_rng))
+        statevec_ref = copy.copy(statevec)
+        statevec.permute(permutation)
+        permute_with_swap(statevec_ref, permutation)
+        assert np.array_equal(statevec.psi, statevec_ref.psi)
+
+    def test_permute_bad_permutation(self) -> None:
+        statevec = Statevec(nqubit=2)
+        with pytest.raises(ValueError, match="Permutation has length"):
+            statevec.permute([0])
+        with pytest.raises(ValueError, match="not a permutation"):
+            statevec.permute([1, 2])
+
+
+def permute_with_swap(dense_state: DenseState, permutation: Sequence[int]) -> None:
+    nqubits = len(permutation)
+    node_index = NodeIndex()
+    node_index.extend(range(nqubits))
+    for i, ind in enumerate(permutation):
+        if node_index.index(ind) != i:
+            move_from = node_index.index(ind)
+            dense_state.swap((i, move_from))
+            node_index.swap(i, move_from)
+
 
 class TestStatevecGraphix:
     """Tests in this class compare the result against the existing statevector simulator in Graphix. They are not self-contained."""
@@ -242,7 +278,7 @@ def test_pattern_simulator(fx_bg: PCG64, jumps: int) -> None:
     nqubits = 5
 
     pattern = rand_circuit(nqubits, depth=5, rng=rng).transpile().pattern
-    pattern.remove_pauli_measurements()
+    pattern.infer_pauli_measurements().remove_pauli_measurements()
 
     sv_test = pattern.simulate_pattern(backend=StatevectorBackend(), rng=rng)
     sv_ref = pattern.simulate_pattern(backend=SBGraphix(), rng=rng)

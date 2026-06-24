@@ -18,6 +18,7 @@ from graphix import parameter
 from graphix.channels import KrausChannel
 from graphix.parameter import Expression, ExpressionOrFloat, ExpressionOrSupportsComplex
 from graphix.sim.base_backend import DenseState, DenseStateBackend, Matrix, kron, matmul, outer, tensordot, vdot
+from graphix.sim.statevec import _check_permutation
 from graphix.states import BasicStates, State
 from typing_extensions import override
 
@@ -259,6 +260,8 @@ class DensityMatrix(DenseState):
         """
         if not isinstance(other, DensityMatrix):
             other = DensityMatrix(other)
+        if self.rho.dtype == np.object_ and other.rho.dtype != np.object_:
+            other.rho = other.rho.astype(np.object_, copy=False)  # pragma: nocover
         self.rho = kron(self.rho, other.rho)
 
     def cnot(self, edge: tuple[int, int]) -> None:
@@ -416,6 +419,17 @@ class DensityMatrix(DenseState):
         result = copy.copy(self)
         result.rho = np.vectorize(lambda value: parameter.xreplace(value, assignment))(self.rho)
         return result
+
+    @override
+    def permute(self, permutation: Sequence[int]) -> None:
+        nqubit = self.nqubit
+        _check_permutation(permutation, nqubit)
+        tensor_shape = [2] * (2 * nqubit)
+        perm_cols = [i + nqubit for i in permutation]
+        full_permutation = [*permutation, *perm_cols]
+        rho_tensor = self.rho.reshape(tensor_shape)
+        rho_permuted_tensor = np.transpose(rho_tensor, axes=full_permutation)
+        self.rho = rho_permuted_tensor.reshape((2**nqubit, 2**nqubit))
 
 
 @dataclass(frozen=True)

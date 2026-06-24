@@ -15,6 +15,7 @@ import numpy.typing as npt
 from graphix import parameter, states
 from graphix.parameter import Expression, ExpressionOrSupportsComplex, check_expression_or_float
 from graphix.sim.base_backend import DenseState, DenseStateBackend, Matrix, kron, tensordot
+from graphix.sim.statevec import _check_permutation
 from graphix.states import BasicStates
 from typing_extensions import override
 
@@ -306,6 +307,8 @@ class Statevec(DenseState):
         """
         psi_self = self.psi.flatten()
         psi_other = other.psi.flatten()
+        if psi_self.dtype == np.object_ and psi_other.dtype != np.object_:
+            psi_other = psi_other.astype(np.object_, copy=False)  # pragma: nocover
 
         total_num = len(self.dims()) + len(other.dims())
         self.psi = kron(psi_self, psi_other).reshape((2,) * total_num)
@@ -410,6 +413,11 @@ class Statevec(DenseState):
         result = Statevec()
         result.psi = np.vectorize(lambda value: parameter.xreplace(value, assignment))(self.psi)
         return result
+
+    @override
+    def permute(self, permutation: Sequence[int]) -> None:
+        _check_permutation(permutation, self.nqubit)
+        self.psi = np.transpose(self.psi, permutation)
 
 
 @dataclass(frozen=True)
