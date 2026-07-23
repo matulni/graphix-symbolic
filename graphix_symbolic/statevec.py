@@ -118,7 +118,7 @@ class Statevec(DenseState):
             ) -> npt.NDArray[np.complex128]:
                 if not isinstance(s, states.State):
                     raise TypeError("Data should be an homogeneous sequence of states.")
-                return s.to_statevector()
+                return s.to_statevector_numpy()
 
             list_of_sv = [state_to_statevector(s) for s in input_list]
 

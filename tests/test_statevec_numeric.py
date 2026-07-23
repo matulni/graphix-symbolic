@@ -11,7 +11,7 @@ import pytest
 from graphix.clifford import Clifford
 from graphix.random_objects import rand_circuit, rand_state_vector
 from graphix.sim.base_backend import NodeIndex
-from graphix.sim.statevec import Statevec as SVGraphix
+from graphix.sim.statevec import Statevector as SVGraphix
 from graphix.sim.statevec import StatevectorBackend as SBGraphix
 from graphix.states import BasicStates
 from numpy.random import Generator
