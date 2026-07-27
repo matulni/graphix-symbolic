@@ -1,3 +1,2 @@
-graphix @ git+https://github.com/matulni/graphix@sv-backend
-# graphix @ git+https://github.com/TeamGraphix/graphix
+graphix @ git+https://github.com/TeamGraphix/graphix
 sympy>=1.9
